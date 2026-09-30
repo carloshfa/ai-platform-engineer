@@ -136,6 +136,7 @@ print(resposta)
 ├── ROADMAP.md             # fases do projeto
 ├── docker-compose.yaml    # Postgres + pgvector
 ├── .env.example           # modelo das variáveis de ambiente (sem valores reais)
+├── .gitignore             # arquivos que nunca vão para o repositório (.env, .venv)
 ├── requirements.txt       # dependências Python
 ├── ingest.py              # código da plataforma
 ├── sql/
@@ -171,3 +172,4 @@ Este projeto imita um ambiente de produção, mas algumas lacunas são conhecida
 - A aplicação conecta ao banco com um usuário administrador. Em produção, deve usar um usuário com o mínimo de privilégios necessários (Fase 6)
 - Não há autenticação: quem chama a função escolhe o `tenant_id`. Isso será resolvido quando a plataforma virar uma API (Fase 2)
 - Não há métricas nem logs estruturados (Fase 4)
+- As credenciais vêm de um arquivo `.env` local. Em produção, viriam de um gerenciador de segredos (Fase 6)

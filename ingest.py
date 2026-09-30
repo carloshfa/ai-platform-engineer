@@ -104,5 +104,5 @@ def rag_query(tenant_id: str, question: str) -> str:
     return answer
 
 if __name__ == "__main__":
-    resposta = rag_query("tenant_carlos", "O que é RAG?")
+    resposta = rag_query("tenant_a", "O que é RAG?")
     print(resposta)

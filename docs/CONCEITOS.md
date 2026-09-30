@@ -112,3 +112,90 @@ Medição real neste projeto (modelo de embedding):
 | Modelo já carregado | cerca de 1,8 s |
 
 O Ollama mantém o modelo na memória por 5 minutos após o último uso (parâmetro `keep_alive`). Manter o modelo carregado reduz a latência, mas ocupa memória da GPU permanentemente. É uma troca clássica de plataforma: latência versus uso de recurso.
+
+---
+
+# Python para este projeto
+
+Esta parte cobre o mínimo de Python necessário para ler o código do projeto, sem pressupor experiência com a linguagem.
+
+## Imports: trazer código pronto para o seu arquivo
+
+Um `import` traz para o seu arquivo um código que outra pessoa já escreveu. Em vez de escrever do zero como fazer uma requisição HTTP ou conversar com o Postgres, você importa quem já faz isso e usa as funções prontas.
+
+### De onde vem cada import
+
+| Origem | Precisa instalar? | Exemplo neste projeto |
+|---|---|---|
+| **Biblioteca padrão** (vem com o Python) | Não | `os` |
+| **Bibliotecas de terceiros** | Sim, com `pip install` | `requests`, `psycopg2`, `dotenv` |
+| **Arquivos do próprio projeto** | Não, basta estar na pasta | (ainda não usamos) |
+
+O `pip install` baixa a biblioteca e coloca dentro de `.venv/Lib/site-packages`. Por isso o ambiente virtual precisa estar **ativado** (com `(.venv)` aparecendo no terminal) na hora de instalar e de rodar o código.
+
+### As duas formas de escrever
+
+**Importar o módulo inteiro:**
+
+```python
+import requests
+
+requests.post(...)   # sempre com o nome do módulo na frente
+```
+
+**Importar só uma peça de dentro dele:**
+
+```python
+from dotenv import load_dotenv
+
+load_dotenv()        # chamada direto, sem prefixo
+```
+
+As duas fazem a mesma coisa. `import dotenv` seguido de `dotenv.load_dotenv()` também funcionaria. A segunda forma costuma ser usada quando você precisa de uma ou duas funções só.
+
+### Nome do pacote vs nome do módulo
+
+O nome que você instala nem sempre é o nome que você importa:
+
+| `pip install` | `import` |
+|---|---|
+| `requests` | `requests` |
+| `psycopg2-binary` | `psycopg2` |
+| `python-dotenv` | `dotenv` |
+
+### O topo do `ingest.py`, linha por linha
+
+```python
+import os                        # padrão: acesso ao sistema, incluindo variáveis de ambiente
+import requests                  # terceiro: chamadas HTTP, usado para falar com o Ollama
+import psycopg2                  # terceiro: conexão com o Postgres
+from dotenv import load_dotenv   # terceiro: só a função que lê o arquivo .env
+```
+
+## Variáveis de ambiente e o arquivo `.env`
+
+Variável de ambiente é um valor guardado no sistema, fora do código, que qualquer programa em execução consegue ler. É a forma padrão de passar configuração e segredos (como senhas) sem escrevê-los no código.
+
+O arquivo `.env` é só um arquivo de texto com essas variáveis. O Python **não lê esse arquivo sozinho**. Quem faz isso é a função `load_dotenv()`:
+
+```python
+from dotenv import load_dotenv   # 1. traz a função para o arquivo
+load_dotenv()                    # 2. lê o .env e carrega os valores no os.environ
+os.environ["POSTGRES_PASSWORD"]  # 3. agora o valor está disponível
+```
+
+`os.environ` funciona como um dicionário: você pede pelo nome da variável e recebe o valor.
+
+## Erros comuns
+
+| Erro | Causa mais provável |
+|---|---|
+| `ModuleNotFoundError: No module named 'dotenv'` | Faltou o `pip install`, ou ele foi feito com o venv desativado |
+| `KeyError: 'POSTGRES_PASSWORD'` | O `.env` não existe, não tem essa variável, ou o `load_dotenv()` não foi chamado antes |
+| `SyntaxError` na linha do import | Erro de digitação, por exemplo `from dotenvimport load_dotenv` sem o espaço |
+
+## Como descobrir o que uma biblioteca oferece
+
+1. **No editor:** passe o mouse sobre o nome da função para ver a descrição e os parâmetros
+2. **Na documentação:** toda biblioteca tem uma página no [pypi.org](https://pypi.org) com link para a documentação
+3. **No terminal:** `python -c "import requests; help(requests.post)"`
