@@ -9,6 +9,8 @@ OLLAMA_URL = "http://localhost:11434/api/embed"
 EMBEDDING_MODEL = "nomic-embed-text"
 LLM_MODEL = "llama3.2:3b"
 LLM_URL = "http://localhost:11434/api/generate"
+RELEVANCE_THRESHOLD = 0.42
+NOT_FOUND_MESSAGE = "Não encontrei informações sobre isso na base de conhecimento."
 
 DB_CONFIG = {
     "host": "localhost",
@@ -72,7 +74,7 @@ def build_prompt(question: str, documents: list[tuple]) -> str:
     context = "\n\n".join([f"- {content}" for _, content, _ in documents])
 
     prompt = f"""Responda à pergunta usando APENAS as informações do contexto abaixo.
-Se o contexto não contiver informação suficiente para responder, diga claramente que não sabe.
+Se o contexto não contiver informação suficiente para responder,  responda exatamente: "{NOT_FOUND_MESSAGE}"
 Não invente informações que não estejam no contexto.
 
 Contexto:
@@ -99,10 +101,21 @@ def generate_answer(prompt: str) -> str:
 
 def rag_query(tenant_id: str, question: str) -> str:
     documents = search_similar(tenant_id, question)
-    prompt = build_prompt(question, documents)
-    answer = generate_answer(prompt)
-    return answer
+    relevant = [doc for doc in documents if doc[2] <= RELEVANCE_THRESHOLD]
+
+    if not relevant:
+        return NOT_FOUND_MESSAGE
+
+    prompt = build_prompt(question, relevant)
+    return generate_answer(prompt)
 
 if __name__ == "__main__":
-    resposta = rag_query("tenant_a", "O que é RAG?")
-    print(resposta)
+    perguntas = [
+        "Como o Kubernetes agenda pods de treino distribuído?",
+        "O que é RAG?",
+        "Qual a receita de bolo de cenoura?",
+    ]
+
+    for pergunta in perguntas:
+        print(f"\nPergunta: {pergunta}")
+        print(f"Resposta: {rag_query('tenant_a', pergunta)}")
