@@ -4,7 +4,7 @@ Projeto de estudo prático de **AI Platform Engineering**: uma plataforma de RAG
 
 O objetivo não é só fazer uma IA responder perguntas. É construir, passo a passo, a infraestrutura que um time de plataforma precisaria operar em produção: isolamento entre clientes, observabilidade, segurança, custo e deploy.
 
-> **Status:** Fase 1 (Núcleo) quase concluída. Veja o [ROADMAP](ROADMAP.md) para as próximas fases e o [Diário](docs/DIARIO.md) para o registro de cada etapa.
+> **Status:** Fase 1 (Núcleo) concluída. Próxima: Fase 2 (Serviço). Veja o [ROADMAP](ROADMAP.md) para as próximas fases e o [Diário](docs/DIARIO.md) para o registro de cada etapa.
 
 ---
 
@@ -24,7 +24,9 @@ Resumo em uma frase: **um modelo de embedding transforma texto em números, o ba
 flowchart LR
     Q[Pergunta + tenant_id] --> E[nomic-embed-text<br/>via Ollama]
     E -->|vetor de 768 números| P[(Postgres + pgvector)]
-    P -->|3 documentos mais parecidos<br/>somente do tenant| B[Montagem do prompt]
+    P -->|3 documentos mais parecidos<br/>somente do tenant| F{Distância<br/>≤ 0.42?}
+    F -->|nenhum passou| N[Mensagem padrão:<br/>não encontrei]
+    F -->|os que passaram| B[Montagem do prompt]
     Q --> B
     B --> L[llama3.2:3b<br/>via Ollama]
     L --> R[Resposta]
@@ -117,7 +119,7 @@ python ingest.py
 | `search_similar(tenant_id, query_text, limit=3)` | Busca os documentos mais parecidos com a pergunta, **somente dentro do tenant informado** |
 | `build_prompt(question, documents)` | Monta o prompt instruindo o LLM a responder apenas com base no contexto |
 | `generate_answer(prompt)` | Chama o LLM e devolve a resposta em texto |
-| `rag_query(tenant_id, question)` | Fluxo completo: busca, monta o prompt e gera a resposta |
+| `rag_query(tenant_id, question)` | Fluxo completo: busca, descarta documentos acima do limite de relevância, monta o prompt e gera a resposta. Se nenhum documento passar, devolve a mensagem padrão sem chamar o LLM |
 
 Exemplo:
 
@@ -160,7 +162,8 @@ Cada escolha tem um motivo, e o motivo importa mais que a ferramenta.
 | **`tenant_id NOT NULL` + índice** | Todo documento tem dono, sem exceção. O índice evita varredura completa da tabela a cada filtro por tenant |
 | **Índice HNSW com distância de cosseno** | Busca aproximada muito mais rápida que comparar a pergunta com todos os vetores, com perda mínima de precisão |
 | **Queries parametrizadas (`%s`)** | Defesa contra SQL injection: o valor enviado é sempre tratado como dado, nunca como comando |
-| **Prompt restrito ao contexto** | O LLM é instruído a responder apenas com os documentos recuperados e a admitir quando não sabe, reduzindo alucinação |
+| **Prompt restrito ao contexto** | O LLM é instruído a responder apenas com os documentos recuperados e a usar uma mensagem padrão quando não sabe, reduzindo alucinação |
+| **Limite de relevância (0.42) antes do LLM** | Pergunta sem documento relevante recebe a mensagem padrão sem chamar o modelo: zero chance de alucinação e uma chamada a menos. O valor foi medido com os dados do projeto e é provisório (detalhes no [Diário](docs/DIARIO.md)) |
 
 ---
 

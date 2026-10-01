@@ -139,3 +139,42 @@ Decidir **antes** de chamar o LLM se existe informação suficiente. Se nenhum d
 
 ### Abordagem
 O limite de distância não pode ser chutado: a escala depende do modelo de embedding. O valor será escolhido a partir de medições com perguntas relevantes e irrelevantes para a base.
+
+### Incidente: credencial publicada no repositório
+
+Antes de continuar o Day 4, uma revisão do repositório encontrou uma credencial exposta. O registro segue o formato de um relatório de incidente.
+
+**O que aconteceu.** O primeiro commit foi enviado para um repositório **público** no GitHub contendo a senha do banco em texto, em dois arquivos:
+
+| Arquivo | Exposição |
+|---|---|
+| `docker-compose.yaml` | Senha em `POSTGRES_PASSWORD` |
+| `ingest.py` | Mesma senha no `DB_CONFIG` |
+
+**Causa.** Configuração escrita diretamente no código durante a fase de testes, sem `.gitignore` nem separação de segredos antes do primeiro push.
+
+**Impacto.** Baixo. Senha de laboratório, banco com documentos de teste, sem acesso externo à rede local. Mesmo assim, foi tratada como comprometida: credencial publicada em repositório público é considerada vazada, independente do impacto imediato.
+
+**Fator agravante encontrado na revisão.** A porta do banco estava publicada como `5432:5432`, o que aceita conexões de qualquer máquina da rede local, e não só da própria máquina.
+
+**Resposta, na ordem executada:**
+
+| Passo | Ação | Por quê |
+|---|---|---|
+| 1 | `.gitignore` criado (`.venv/`, `.env`, `__pycache__/`, `*.pyc`) | Impedir que segredos e arquivos gerados voltem a entrar no repositório |
+| 2 | Senha nova gerada com `secrets.token_urlsafe(24)` | Valor aleatório adequado para segurança, sem caracteres que exijam tratamento especial |
+| 3 | Senha trocada com `ALTER USER`, com o banco em execução | Contenção: a senha publicada deixa de funcionar. Diferente do Day 2, o volume **não** foi recriado, que é o procedimento correto quando há dados |
+| 4 | `.env` (local) e `.env.example` (no repositório) criados | Separar os valores reais da documentação de quais variáveis existem |
+| 5 | `docker-compose.yaml` passou a ler `${POSTGRES_...}` e a porta foi restrita a `127.0.0.1` | Remover o segredo da configuração e fechar o banco para a rede |
+| 6 | `ingest.py` passou a ler as credenciais com `python-dotenv` e `os.environ` | Remover o segredo do código |
+| 7 | Arquivo vazio `queryes.psql` removido | Limpeza |
+| 8 | Commit substituído com `git commit --amend` e enviado com `git push --force-with-lease` | Tirar a senha antiga do histórico do repositório |
+
+**Limitação conhecida.** Reescrever o histórico não garante que a versão antiga sumiu do GitHub: o commit anterior pode continuar acessível por algum tempo para quem tiver o identificador dele. Por isso a troca de senha (passo 3) é o que de fato resolve o incidente. A reescrita do histórico só mantém o repositório limpo.
+
+**Aprendizados**
+- Segredo nunca vai para o código, nem em laboratório. O `.gitignore` e o `.env` precisam existir **antes** do primeiro commit
+- A ordem da resposta importa: primeiro invalidar a credencial, depois limpar o código, por último o histórico
+- `ALTER USER` troca a senha sem perder dados. Recriar o volume só é aceitável quando não há nada a preservar
+- Os comandos digitados ficam salvos no histórico do terminal, inclusive senhas. No PowerShell, o arquivo fica em `(Get-PSReadLineOption).HistorySavePath`
+- Na Fase 6, uma verificação automática de segredos antes de cada commit (por exemplo, com gitleaks) evita que isso se repita

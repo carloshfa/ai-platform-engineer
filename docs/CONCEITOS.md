@@ -115,6 +115,24 @@ O Ollama mantém o modelo na memória por 5 minutos após o último uso (parâme
 
 ---
 
+## Limite de relevância
+
+A busca vetorial **sempre** devolve os documentos mais próximos, mesmo quando nenhum deles tem a ver com a pergunta. "Mais próximo" não quer dizer "relevante".
+
+O limite de relevância é uma regra aplicada antes de chamar o LLM: documentos com distância acima do limite são descartados. Se nenhum sobrar, o sistema responde com uma mensagem padrão, sem chamar o modelo.
+
+Valores medidos neste projeto:
+
+| Situação | Distância |
+|---|---|
+| Documentos relevantes | 0.26 a 0.37 |
+| Documentos irrelevantes | 0.45 a 0.52 |
+| **Limite escolhido** | **0.42** |
+
+Esse valor só vale para o modelo de embedding usado aqui. Outro modelo gera distâncias em outra escala, e o limite precisa ser medido de novo.
+
+---
+
 # Python para este projeto
 
 Esta parte cobre o mínimo de Python necessário para ler o código do projeto, sem pressupor experiência com a linguagem.
@@ -199,3 +217,30 @@ os.environ["POSTGRES_PASSWORD"]  # 3. agora o valor está disponível
 1. **No editor:** passe o mouse sobre o nome da função para ver a descrição e os parâmetros
 2. **Na documentação:** toda biblioteca tem uma página no [pypi.org](https://pypi.org) com link para a documentação
 3. **No terminal:** `python -c "import requests; help(requests.post)"`
+
+## List comprehension: filtrar uma lista em uma linha
+
+```python
+relevant = [doc for doc in documents if doc[2] <= RELEVANCE_THRESHOLD]
+```
+
+Lendo em português: "monte uma lista com cada `doc` de `documents`, mas só os que tiverem distância menor ou igual ao limite". É o mesmo que este laço, escrito de forma mais curta:
+
+```python
+relevant = []
+for doc in documents:
+    if doc[2] <= RELEVANCE_THRESHOLD:
+        relevant.append(doc)
+```
+
+Cada `doc` é uma tupla `(id, content, distance)`. O `[2]` pega o terceiro item, porque em Python a contagem começa em 0.
+
+## Retorno antecipado
+
+```python
+if not relevant:
+    return NOT_FOUND_MESSAGE
+```
+
+Uma lista vazia conta como "falso" em Python, então `not relevant` é verdadeiro quando nenhum documento passou no filtro. O `return` encerra a função ali mesmo, e o código abaixo dele (que chamaria o LLM) não é executado.
+
