@@ -4,7 +4,7 @@ Projeto de estudo prático de **AI Platform Engineering**: uma plataforma de RAG
 
 O objetivo não é só fazer uma IA responder perguntas. É construir, passo a passo, a infraestrutura que um time de plataforma precisaria operar em produção: isolamento entre clientes, observabilidade, segurança, custo e deploy.
 
-> **Status:** Fase 1 (Núcleo) concluída. Próxima: Fase 2 (Serviço). Veja o [ROADMAP](ROADMAP.md) para as próximas fases e o [Diário](docs/DIARIO.md) para o registro de cada etapa.
+> **Status:** Fase 2 (Serviço) em andamento. A API já responde no `/health`; os demais endpoints estão descritos em [docs/API.md](docs/API.md). Veja o [ROADMAP](ROADMAP.md) para as próximas fases e o [Diário](docs/DIARIO.md) para o registro de cada etapa.
 
 ---
 
@@ -90,9 +90,10 @@ docker compose up -d
 
 ```bash
 docker exec -i rag-postgres psql -U <seu_usuario> -d <seu_banco> < sql/001_schema.sql
+docker exec -i rag-postgres psql -U <seu_usuario> -d <seu_banco> < sql/002_api_keys.sql
 ```
 
-Esse script habilita a extensão `vector`, cria a tabela `documents` e os índices.
+Os scripts são aplicados em ordem: o `001` habilita a extensão `vector` e cria a tabela `documents`; o `002` cria a tabela de chaves de API. No PowerShell, use `Get-Content sql/001_schema.sql | docker exec -i rag-postgres psql ...`, porque o `<` não funciona lá.
 
 ### 5. Preparar o Python
 
@@ -102,11 +103,28 @@ source .venv/Scripts/activate   # Windows (Git Bash). No Linux/macOS: source .ve
 pip install -r requirements.txt
 ```
 
-### 6. Executar
+### 6. Executar o núcleo (script)
 
 ```bash
 python ingest.py
 ```
+
+### 7. Criar uma chave de API
+
+```bash
+python create_api_key.py tenant_a "teste local"
+```
+
+A chave aparece **uma única vez**. O banco guarda só o hash.
+
+### 8. Subir a API
+
+```bash
+uvicorn api:app --reload --host 127.0.0.1 --port 8000
+```
+
+- Saúde: `http://127.0.0.1:8000/health`
+- Documentação interativa: `http://127.0.0.1:8000/docs`
 
 ---
 
@@ -140,10 +158,14 @@ print(resposta)
 ├── .env.example           # modelo das variáveis de ambiente (sem valores reais)
 ├── .gitignore             # arquivos que nunca vão para o repositório (.env, .venv)
 ├── requirements.txt       # dependências Python
-├── ingest.py              # código da plataforma
+├── ingest.py              # núcleo: embeddings, busca e geração
+├── api.py                 # API HTTP (FastAPI)
+├── create_api_key.py      # cria chaves de API para um tenant
 ├── sql/
-│   └── 001_schema.sql     # criação da tabela e índices
+│   ├── 001_schema.sql     # tabela de documentos e índices
+│   └── 002_api_keys.sql   # tabela de chaves de API
 └── docs/
+    ├── API.md             # contrato da API, para clientes e agentes
     ├── CONCEITOS.md       # guia para iniciantes
     └── DIARIO.md          # registro de cada etapa, com resultados e erros
 ```

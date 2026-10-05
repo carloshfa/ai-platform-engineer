@@ -244,3 +244,46 @@ O valor escolhido foi **0.42**, perto do meio do intervalo. Em caso de dúvida, 
 ### Fase 1 concluída
 Com o Day 4, o núcleo está provado: serving local dos modelos, busca vetorial com isolamento por tenant, geração restrita ao contexto e limite de relevância. A próxima fase transforma o script em um serviço.
 
+---
+
+## Day 5: Chaves de API e esqueleto da API
+
+**Fase:** 2 (Serviço) · **Competência:** autenticação, design de API  
+**Retorno:** prática (primeiro código escrito com o raciocínio de desenho explicado antes), produto (autenticação por cliente e o primeiro endpoint da API) e empregabilidade (armazenamento seguro de credenciais)
+
+### Objetivo
+Preparar a base da API: um jeito de identificar cada cliente sem confiar no que ele envia, e o primeiro endpoint rodando.
+
+### Contrato da API
+Antes de qualquer código, o contrato foi desenhado e registrado em [API.md](API.md). As principais decisões:
+- O tenant vem da chave de API; o cliente nunca informa qual tenant é
+- Nenhum detalhe interno (modelo, limite, distância) entra ou sai pelo contrato
+- `/health` público e mínimo; `/v1/status` detalhado e protegido
+- Campo `found` na resposta, para que agentes decidam o próximo passo sem interpretar texto
+
+### O que foi feito
+- `sql/002_api_keys.sql`: tabela `api_keys` com `tenant_id`, `name`, `key_hash` (único), `created_at` e `revoked_at`
+- `create_api_key.py`: gera a chave com `secrets`, grava **só o hash** e mostra a chave uma única vez
+- `api.py`: aplicação FastAPI com `GET /health`, que verifica banco e Ollama
+
+### Decisões
+| Decisão | Motivo |
+|---|---|
+| Guardar só o hash da chave | Se o banco vazar, as chaves não vazam junto |
+| SHA-256, e não bcrypt | Chaves geradas pela máquina são longas e aleatórias, impossíveis de adivinhar por tentativa. O hash rápido e determinístico permite buscar a chave direto pelo índice. Hash lento é para senhas escolhidas por pessoas |
+| Prefixo `rag_` nas chaves | Facilita identificar uma chave vazada, por pessoas e por ferramentas de varredura de segredos |
+| Revogar com data em `revoked_at`, sem apagar | Mantém o histórico para auditoria |
+| Migration numerada (`002`) | O `001` já foi aplicado; o histórico do banco fica registrado em ordem |
+| `/health` como verificação de *readiness* | Checa as dependências. Na Fase 5, com Kubernetes, será separado em *liveness* e *readiness* |
+| Capturar só `psycopg2.Error` e `requests.RequestException` | Um erro de código não deve ser confundido com dependência fora do ar |
+
+### Resultados
+- Chave criada para `tenant_a`. O SHA-256 recalculado a partir da chave impressa bateu com o hash guardado no banco, e a chave em si não aparece em lugar nenhum da tabela
+- `GET /health` com tudo funcionando: `200 OK` e `{"status":"ok"}`
+- `GET /health` com o banco parado (`docker stop rag-postgres`): `503 Service Unavailable` e `{"status":"unavailable"}`. O endpoint foi provado também no cenário de falha, e não só no caminho feliz
+- Com o banco de volta (`docker start rag-postgres`), o `/health` voltou a responder `200 OK` **sem reiniciar a API**: ela se recupera sozinha quando a dependência volta, porque cada verificação abre uma conexão nova
+
+### Aprendizados
+- Hash é um caminho de mão única: quem perde a chave não recupera, e quem rouba o hash não consegue usar a API
+- Antes de escrever código: objetivo em uma frase, entradas e saídas, passos em português, divisão em funções, ferramentas. Só então o código
+- O cabeçalho `server: uvicorn` revela a tecnologia do servidor. Será removido no endurecimento da Fase 6

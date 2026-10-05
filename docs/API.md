@@ -24,7 +24,7 @@ Authorization: Bearer <sua-chave>
 
 | Método | Caminho | Autenticação | Status |
 |---|---|---|---|
-| `GET` | `/health` | Não | Planejado |
+| `GET` | `/health` | Não | Implementado |
 | `POST` | `/v1/query` | Sim | Planejado |
 | `POST` | `/v1/documents` | Sim | Planejado |
 | `GET` | `/v1/status` | Sim | Planejado |

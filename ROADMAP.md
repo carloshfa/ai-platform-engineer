@@ -22,7 +22,7 @@ Se um Day planejado entrega só um retorno, ele é repensado ou cortado. A ordem
 | Fase | Pergunta que responde | Status |
 |---|---|---|
 | 1. Núcleo | Funciona? | ✅ Concluída |
-| 2. Serviço | Outro time consegue usar sem entender a infraestrutura? | 🟡 Próxima |
+| 2. Serviço | Outro time consegue usar sem entender a infraestrutura? | 🟡 Em andamento |
 | 3. Ingestão | Os dados entram de forma confiável e reprocessável? | ⚪ Planejada |
 | 4. Observabilidade | Conseguimos ver o que está acontecendo? | ⚪ Planejada |
 | 5. Kubernetes | Escala e se recupera de falhas? | ⚪ Planejada |
@@ -48,10 +48,11 @@ Provar que o fluxo completo de RAG funciona, com isolamento por tenant.
 
 Transformar o script em um serviço que outros sistemas consomem.
 
-- [ ] API HTTP (FastAPI) com endpoints de ingestão e consulta
-- [ ] Identificação do tenant pela autenticação, não por parâmetro livre
-- [ ] Aplicação em container, todos os componentes no Docker Compose
-- [ ] Health checks
+- [x] Contrato da API definido ([docs/API.md](docs/API.md))
+- [x] Day 5: tabela de chaves de API, script de criação de chaves e esqueleto da API com `/health`
+- [ ] Day 6: `/v1/query` com autenticação por chave
+- [ ] Day 7: `/v1/documents` e `/v1/status`
+- [ ] Day 8: API em container, todos os componentes no Docker Compose
 
 ## Fase 3: Ingestão
 
@@ -86,6 +87,7 @@ Transformar o script em um serviço que outros sistemas consomem.
 
 - [ ] Row Level Security no Postgres: isolamento garantido pelo banco
 - [ ] Usuário de aplicação com privilégio mínimo
+- [ ] Remover o cabeçalho `server` das respostas da API
 - [ ] Secrets em um gerenciador de segredos (o `.env` resolve só o laboratório)
 - [ ] Verificação automática de segredos a cada commit (ex.: gitleaks)
 - [ ] Quota e rate limit por tenant
