@@ -130,7 +130,7 @@ Passar os documentos encontrados para o LLM e gerar uma resposta final.
 
 ---
 
-## Day 4: Limite de relevância (em andamento)
+## Day 4: Limite de relevância
 
 **Fase:** 1 (Núcleo) · **Competência:** custo e confiabilidade
 
@@ -138,7 +138,7 @@ Passar os documentos encontrados para o LLM e gerar uma resposta final.
 Decidir **antes** de chamar o LLM se existe informação suficiente. Se nenhum documento for relevante o bastante, responder direto com uma mensagem padrão, sem gastar uma chamada de modelo e sem risco de alucinação.
 
 ### Abordagem
-O limite de distância não pode ser chutado: a escala depende do modelo de embedding. O valor será escolhido a partir de medições com perguntas relevantes e irrelevantes para a base.
+O limite de distância não pode ser chutado: a escala depende do modelo de embedding. O valor foi escolhido a partir de medições com perguntas relevantes e irrelevantes para a base.
 
 ### Incidente: credencial publicada no repositório
 
@@ -178,3 +178,65 @@ Antes de continuar o Day 4, uma revisão do repositório encontrou uma credencia
 - `ALTER USER` troca a senha sem perder dados. Recriar o volume só é aceitável quando não há nada a preservar
 - Os comandos digitados ficam salvos no histórico do terminal, inclusive senhas. No PowerShell, o arquivo fica em `(Get-PSReadLineOption).HistorySavePath`
 - Na Fase 6, uma verificação automática de segredos antes de cada commit (por exemplo, com gitleaks) evita que isso se repita
+
+### Preparação: renomeação dos tenants
+Os tenants de teste foram renomeados para nomes neutros (`tenant_a` e `tenant_b`), no código e no banco ao mesmo tempo:
+
+```sql
+UPDATE documents SET tenant_id = 'tenant_a' WHERE tenant_id = 'tenant_carlos';
+UPDATE documents SET tenant_id = 'tenant_b' WHERE tenant_id = 'tenant_maria';
+```
+
+**Armadilha encontrada:** com o código já usando `tenant_a` e o banco ainda com o nome antigo, a pergunta "O que é RAG?" respondia "Não sabe." do mesmo jeito. Só que por outro motivo: a busca não encontrava nenhum documento e o LLM recebia o contexto vazio. O teste passava sem provar nada. A confirmação real veio com uma pergunta que **tem** resposta na base.
+
+### Medições
+Distância de cosseno para três perguntas no `tenant_a` (quanto menor, mais parecido):
+
+| Pergunta | Documento mais próximo | Distância | Tipo |
+|---|---|---|---|
+| Como o Kubernetes agenda pods de treino distribuído? | Gang scheduling | 0.2589 | Relevante |
+| Como o Kubernetes agenda pods de treino distribuído? | Kueue (2º documento) | 0.3749 | Relacionado |
+| O que é RAG? | Kueue | 0.4540 | Sem resposta na base |
+| Qual a receita de bolo de cenoura? | Kueue | 0.4663 | Fora do assunto |
+
+Referência do Day 2: o documento sobre atraso de entrega contra a pergunta de Kubernetes ficou em 0.4565, na mesma faixa dos irrelevantes.
+
+**Observações**
+- Existe um intervalo vazio entre 0.3749 e 0.4540: tudo que é relevante ficou abaixo, tudo que é irrelevante ficou acima
+- As distâncias dos irrelevantes se concentram numa faixa estreita (0.45 a 0.52). "Bolo de cenoura" quase não fica mais longe que "O que é RAG?". O modelo separa bem relevante de irrelevante, mas não mede o quanto algo é irrelevante
+
+### Decisão: limite de 0.42
+Como num threshold de alerta, há dois erros possíveis:
+
+| Limite | Erro | Efeito |
+|---|---|---|
+| Baixo demais (ex.: 0.35) | Falso negativo | Corta o documento do Kueue, que é relevante, e o sistema diz "não encontrei" com a resposta na base |
+| Alto demais (ex.: 0.50) | Falso positivo | Deixa passar documentos irrelevantes e volta a depender só da instrução do prompt |
+
+O valor escolhido foi **0.42**, perto do meio do intervalo. Em caso de dúvida, o limite erra para o lado de deixar passar, porque o prompt restrito ao contexto continua funcionando como segunda camada de proteção (defesa em profundidade).
+
+**É um limite provisório:** foi calibrado com 3 documentos e 3 perguntas. Na Fase 8, ele será recalibrado com um conjunto de avaliação maior.
+
+### O que foi feito
+- Constantes `RELEVANCE_THRESHOLD = 0.42` e `NOT_FOUND_MESSAGE` no topo do `ingest.py`, para recalibrar mudando uma linha
+- `rag_query` passou a filtrar os documentos pela distância **antes** de montar o prompt. Se nenhum passar, a função devolve a mensagem padrão e o LLM não é chamado
+- Só os documentos que passaram no filtro vão para o prompt, mesmo quando a busca traz outros
+- O prompt passou a instruir o modelo a responder exatamente com a `NOT_FOUND_MESSAGE` quando o contexto não bastar, em vez de inventar a própria frase (o "Não sabe." do Day 3)
+
+### Resultados
+
+| Pergunta | Resposta | LLM chamado? |
+|---|---|---|
+| Como o Kubernetes agenda pods de treino distribuído? | "Kubernetes agenda pods de treino distribuído usando gang scheduling." | Sim |
+| O que é RAG? | "Não encontrei informações sobre isso na base de conhecimento." | Não |
+| Qual a receita de bolo de cenoura? | "Não encontrei informações sobre isso na base de conhecimento." | Não |
+
+### Aprendizados
+- O valor de um limite sai dos dados, não de um número genérico. Ele depende do modelo de embedding: se o modelo mudar, o limite precisa ser medido de novo
+- Uma regra determinística antes do LLM elimina a chance de alucinação nos casos sem resposta e economiza uma chamada de modelo
+- O filtro e o prompt restrito são duas camadas independentes. Se uma falhar, a outra ainda protege
+- Um teste que passa não prova nada se ele passaria também no cenário errado. Escolher a pergunta de teste é parte do teste
+
+### Fase 1 concluída
+Com o Day 4, o núcleo está provado: serving local dos modelos, busca vetorial com isolamento por tenant, geração restrita ao contexto e limite de relevância. A próxima fase transforma o script em um serviço.
+
