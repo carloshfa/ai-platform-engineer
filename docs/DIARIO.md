@@ -6,7 +6,8 @@ Registro de cada etapa: o que foi feito, o que foi medido, o que deu errado e o 
 
 ## Day 1: Serving de modelos com Ollama
 
-**Fase:** 1 (Núcleo) · **Competência:** model serving
+**Fase:** 1 (Núcleo) · **Competência:** model serving  
+**Retorno:** prática (serving de modelos e medição de latência) e visibilidade (post sobre o experimento de alucinação)
 
 ### Objetivo
 Colocar um LLM e um modelo de embedding para rodar localmente, servidos por uma API HTTP.
@@ -57,7 +58,8 @@ A mesma pergunta, com pequenas variações de escrita:
 
 ## Day 2: Banco vetorial e isolamento multi-tenant
 
-**Fase:** 1 (Núcleo) · **Competência:** armazenamento vetorial, isolamento de dados
+**Fase:** 1 (Núcleo) · **Competência:** armazenamento vetorial, isolamento de dados  
+**Retorno:** prática (pgvector, troubleshooting de volume Docker), produto (isolamento por tenant, base de um produto multi-cliente) e visibilidade (post sobre isolamento)
 
 ### Objetivo
 Guardar documentos e vetores no Postgres com pgvector, com separação por cliente, e fazer buscas via Python.
@@ -105,7 +107,8 @@ O tenant_b recebeu seu único documento, mesmo irrelevante, e **não** recebeu o
 
 ## Day 3: RAG completo
 
-**Fase:** 1 (Núcleo) · **Competência:** redução de alucinação por arquitetura
+**Fase:** 1 (Núcleo) · **Competência:** redução de alucinação por arquitetura  
+**Retorno:** prática (fluxo completo de RAG), produto (redução de alucinação por arquitetura) e visibilidade (post antes e depois)
 
 ### Objetivo
 Passar os documentos encontrados para o LLM e gerar uma resposta final.
@@ -132,7 +135,8 @@ Passar os documentos encontrados para o LLM e gerar uma resposta final.
 
 ## Day 4: Limite de relevância
 
-**Fase:** 1 (Núcleo) · **Competência:** custo e confiabilidade
+**Fase:** 1 (Núcleo) · **Competência:** custo e confiabilidade  
+**Retorno:** os quatro. Prática (calibração a partir de medições), produto (regra determinística antes do LLM, com menos custo e sem alucinação nos casos sem resposta), empregabilidade (relatório de resposta a incidente no repositório) e visibilidade (posts do incidente e do limite)
 
 ### Objetivo
 Decidir **antes** de chamar o LLM se existe informação suficiente. Se nenhum documento for relevante o bastante, responder direto com uma mensagem padrão, sem gastar uma chamada de modelo e sem risco de alucinação.
